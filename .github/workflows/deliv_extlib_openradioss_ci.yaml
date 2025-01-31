@@ -1,0 +1,349 @@
+name: Delivery extlib (incl HMReader from JF) as assets in a release
+
+# This CI is triggerd by Gitlab Radioss CI to get libhmreader from Jfrog, extlib locally, provide them as a release asset, and set the new version to use into OpenRadioss
+
+on:
+
+  workflow_dispatch:
+    inputs:
+      deliv_commit:
+        description: 'The commit related to the hmreader libraries we want to deliver'
+        required: true
+
+env:
+  DELIV_COMMIT: ${{ github.event.inputs.deliv_commit }}
+  FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+  TO_EMAIL: ${{ secrets.TO_EMAIL }}
+  MAIL_RELAY: ${{ secrets.MAIL_RELAY }}
+  CI: 'true'  # if true, disables interactive prompts and progress bar  
+  JFROG_CLI_LOG_LEVEL: "ERROR"
+  JFROG_CLI_AVOID_NEW_VERSION_WARNING: "true"
+  JF_OPTIONS: "--url=${{ secrets.JFROG_DELIVERY_URL }} --user=${{ secrets.JFROG_DELIVERY_USER }} --password=${{ secrets.JFROG_DELIVERY_TOKEN }}"
+  MAIL_CONFIG_FILE: "/etc/mail.rc"
+  MAIL_COMMAND: "Mail"
+  VERSION_FILE: "EXTLIB_VERSION.json"
+
+jobs:
+
+  deliver_hmreader_openradioss:
+    if: ${{ github.repository_owner == 'OpenRadioss' }}
+    # DEV ONLY # runs-on: ["dev_delivery","dev"] 
+    runs-on: ["delivery","prod"]
+    container: 
+      image: fr-qafactorydev.europe.altair.com/common-linux64
+      credentials: 
+        username: ${{secrets.DOCKER_REGISTRY_USER}}
+        password: ${{secrets.DOCKER_REGISTRY_PASSWD}}
+      volumes: 
+        - /etc/localtime:/etc/localtime:ro
+ 
+    env:
+      HW_SOLVER_PREFIX: ${{ secrets.JFROG_DELIVERY_RADIOSS_REPO }}
+      HMREADER_PREFIX: "hm_reader"
+      HMREADER_OPENSOURCE_LOCAL_DIR: "extlib/hm_reader"
+      GIT_PUSH_SERVBOT_PAT: ${{ secrets.GIT_PUSH_SERVBOT_PAT }}
+      GO_PUSH: 0
+      GO_PUSH_OR: 0   
+      GIT_SERVBOT_USER: ${{ secrets.GIT_SERVBOT_USER }}   
+      GIT_SERVBOT_EMAIL: ${{ secrets.GIT_SERVBOT_EMAIL }} 
+      STATUS_STEP_CHECK_DELIV_COMMIT: 0
+      MSG_STEP_CHECK_DELIV_COMMIT: "Some libraries are missing on Jfrog"  
+      STATUS_STEP_CHECK_LIBS: 0
+      MSG_STEP_CHECK_LIBS: "Some libraries are missing on Jfrog"  
+      STATUS_STEP_GET_LIBS: 0
+      MSG_STEP_GET_LIBS: "Could not get libraries from Jfrog"  
+      STATUS_STEP_PUSH: 0
+      MSG_STEP_PUSH: "Could not push extlib version on repository"  
+      STATUS_STEP_PUSH_OR: 0
+      MSG_STEP_PUSH_OR: "Could not push extlib version on OpenRadioss repository"  
+      STATUS_STEP_CREATE_RELEASE: 0
+      MSG_STEP_CREATE_RELEASE: "Could not create release on repository"
+      STATUS_STEP_SET_EXLIB_VERSION_IN_OPENRADIOSS: 0
+      MSG_STEP_SET_EXLIB_VERSION_IN_OPENRADIOSS: "Could not set extlib version in OpenRadioss repository"     
+      STATUS_STEP_TRIGGER_OR: 0
+      MSG_STEP_TRIGGER_OR: "Could not trigger OpenRadioss CI"
+
+    steps:
+
+      - name: Checking delivery commit
+        run: |
+          # Get branch
+          export BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+          
+          export HM_REMOTE_DIR="${HW_SOLVER_PREFIX}/${HMREADER_PREFIX}/${BRANCH_NAME}/${DELIV_COMMIT}"
+          echo "HM_REMOTE_DIR=${HM_REMOTE_DIR}" >> $GITHUB_ENV
+
+          # Check if the commit exist on jfrog
+          result_hm=$(jf rt s ${JF_OPTIONS} "${HM_REMOTE_DIR}/*")
+
+          if [[ "${result_hm}" == "[]" ]]
+          then
+            echo "Commit ${DELIV_COMMIT} does not exist on Jfrog."
+            exit 1
+          fi
+
+          # Set correct end of step status (if not an email will be sent)
+          echo "STATUS_STEP_CHECK_DELIV_COMMIT=1" >> $GITHUB_ENV          
+
+      - name: Check all libs are present
+        run: |     
+          echo "-------------------------"
+          echo "Verify libraries on jfrog"
+          echo "-------------------------"
+
+          patterns=(
+            "linux64/libhm_reader_linux64.so"
+            "linuxa64/libhm_reader_linuxa64.so"
+            "win64/hm_reader_win64.lib"
+            "win64/hm_reader_win64.dll"
+          )
+
+          result_array=$(jf rt search ${JF_OPTIONS} ${{ env.HM_REMOTE_DIR }}/* | grep '"path":' | sed 's/.*"path": "//' | sed 's/",//')
+
+          all_found=true
+          not_found_libs=''
+
+          # Loop through each pattern
+          for pattern in "${patterns[@]}"; do
+              # Check if the pattern is present in any line
+              found=false
+              for line in "${result_array[@]}"; do
+                  if echo "$line" | grep -q "$pattern"; then
+                      found=true
+                      break
+                  fi
+              done
+
+              # If the pattern was not found in any line, mark as not all found
+              if ! $found; then
+                  # echo "Pattern '$pattern' not found in any line."
+                  not_found_libs+="\n${pattern}"
+                  all_found=false
+              # else
+              #     echo "Pattern '$pattern' found."
+              fi
+          done
+
+          # Final result check
+          if $all_found; then
+              echo -e "\nAll librarie have been found!"
+              # Set correct end of step status (if not an email will be sent)
+              echo "STATUS_STEP_CHECK_LIBS=1" >> $GITHUB_ENV
+          else
+              echo -e "\nSome librariy pattern has not been found:\n${not_found_libs}"
+              exit 1
+          fi
+
+      # Get last git modifications
+      - name: Checkout git sources
+        uses: actions/checkout@v4
+        with:
+          clean: 'true'
+          # Use a PAT else the push won't trigger the next workflow
+          token: ${{ env.GIT_PUSH_SERVBOT_PAT }}          
+
+      - name: Get hm reader libs locally
+        run: |
+          echo "--------------"
+          echo "Getting HM Reader files"
+          echo "----------"
+
+          # Force local branch to point on same commit as remote branch, way to restore a correct env if old push failed before
+          git fetch origin ${BRANCH_NAME}
+          git reset --hard origin/${BRANCH_NAME}
+          echo "-------checkout"
+          git branch && git log --pretty=oneline -n 5
+          echo "-------"      
+
+          # # Opensource libs
+          jf rt download ${JF_OPTIONS} --flat=true --recursive --exclusions="*/_com/*" "${{ env.HM_REMOTE_DIR }}/(*)" ${HMREADER_OPENSOURCE_LOCAL_DIR}/{1}
+
+          # Get current date in YYYY-MM-DD format
+          current_date=$(date +%F)
+
+          # Get current version in VERSION_FILE
+          current_version=$(grep -oP '"version"\s*:\s*"\K[^"]+' ${{ env.VERSION_FILE }})
+          current_version=$((current_version + 1))
+          echo "Current version is: ${current_version}"
+          asset_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/v${current_version}/extlib.zip"
+          echo "{ \"version\":\"${current_version}\",\"delivery_date\":\"${current_date}\",\"url\":\"${asset_url}\"}" > ${{ env.VERSION_FILE }}
+          echo "EXTLIB_VERSION=${current_version}" >> $GITHUB_ENV
+          echo "EXTLIB_URL=${asset_url}" >> $GITHUB_ENV
+          echo "CURRENT_DATE=${current_date}" >> $GITHUB_ENV
+
+          # Add new files
+          git config --global user.email "${{ env.GIT_SERVBOT_EMAIL }}"
+          git config --global user.name "${{ env.GIT_SERVBOT_USER }}"
+          git add ${{ env.VERSION_FILE }}
+          echo "---status----" 
+          git status
+          echo "---status----" 
+
+          git commit -m "Update extlib version to v${current_version}"
+
+          # Create zip for asset
+          cp ${{ env.VERSION_FILE }} extlib/
+          zip -r extlib.zip extlib
+
+          if [[ -n $(git status --porcelain) ]]; then
+            # Set correct end of step status (if not an email will be sent)
+            echo "STATUS_STEP_GET_LIBS=1" >> $GITHUB_ENV
+            echo "GO_PUSH=1" >> $GITHUB_ENV
+          else
+            echo "There are no changes in the repository, abort."
+            exit 1
+          fi
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        if: ${{ env.GO_PUSH == 1 }} 
+        with:
+          github_token: ${{ env.GIT_PUSH_SERVBOT_PAT }}
+          branch: ${{ github.ref }}     
+          directory: ${{ env.WORKDIR }}    
+
+      - name: Set push status
+        working-directory: ${{ env.WORKDIR }}
+        run: |    
+          # Set correct end of step status (if not an email will be sent)
+          echo "STATUS_STEP_PUSH=1" >> $GITHUB_ENV
+
+      # The action creates the release with an already existing tag (latest-xxxxx) so we use option skip_tag_creation: true
+      # We do this because we have already checkouted the wanted commit before
+      # Prerequisite: create the tag with command : git tag latest-YYYMMDD <commit id>; git push origin latest-YYYMMDD
+      - name: Release the new binaries
+        uses: docker://ghcr.io/mini-bomba/create-github-release:v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: "v${{ env.EXTLIB_VERSION }}"
+          name: "Extlib v${{ env.EXTLIB_VERSION }}"            
+          body: |
+            Find here last ext libs for radioss including hmreader in version v${{ env.EXTLIB_VERSION }} deliverd on ${{ env.CURRENT_DATE }}
+          files: |
+            extlib.zip
+          clear_attachments: true    
+
+      - name: Set release creation status
+        working-directory: ${{ env.WORKDIR }}
+        run: |    
+          # Set correct end of step status (if not an email will be sent)
+          echo "STATUS_STEP_CREATE_RELEASE=1" >> $GITHUB_ENV
+
+      # Trigger OpenRadioss CI to set the new version of extlib and cause a build/qa
+      - name: Trigger OpenRadioss CI
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ env.GIT_PUSH_SERVBOT_PAT }}
+          repository: '${{ secrets.OPENRADIOSS_REPOSITORY }}'
+          event-type: 'extlib-update'
+          client-payload: '{"ref": "${{ github.ref }}", "version": "${{ env.EXTLIB_VERSION }}", "delivery_date": "${{ env.CURRENT_DATE }}","url": "${{ env.EXTLIB_URL }}"}'
+
+      - name: Trigger OpenRadioss CI to set extlib version
+        working-directory: ${{ env.WORKDIR }}
+        run: |    
+          # Set correct end of step status (if not an email will be sent)
+          echo "STATUS_STEP_TRIGGER_OR=1" >> $GITHUB_ENV
+
+      - name: Managing step execution
+        if: ${{ always() }}
+        run: |
+
+          LOG_PATH="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          MAILMSG="The delivery of hm reader libraries into OpenRadioss repository fails.\n\nFind detail in log page ${LOG_PATH}\n\n"
+          CONTINUE=1
+
+          echo -e "\n#### STATUS_STEP_CHECK_DELIV_COMMIT ###"
+          if [ "$STATUS_STEP_CHECK_DELIV_COMMIT" = 0 ]
+          then
+            echo -e "Status\t[ \033[31;2;1mFAILED\033[0m ]" 
+            MAILMSG+="$MSG_STEP_CHECK_DELIV_COMMIT\n"
+            CONTINUE=0
+          else
+            echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
+          fi
+
+          if [ "$CONTINUE" = 1 ]
+          then          
+            echo -e "\n#### STATUS_STEP_CHECK_LIBS ###"
+            if [ "$STATUS_STEP_CHECK_LIBS" = 0 ]
+            then
+              echo -e "Status\t[ \033[31;2;1mFAILED\033[0m ]" 
+              MAILMSG+="$MSG_STEP_CHECK_LIBS\n"
+              CONTINUE=0
+            else
+              echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
+            fi
+          fi
+
+          if [ "$CONTINUE" = 1 ]
+          then          
+            echo -e "\n#### STATUS_STEP_GET_LIBS ###"
+            if [ "$STATUS_STEP_GET_LIBS" = 0 ]
+            then
+              echo -e "Status\t[ \033[31;2;1mFAILED\033[0m ]" 
+              MAILMSG+="$MSG_STEP_GET_LIBS\n"
+              CONTINUE=0
+            else
+              echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
+            fi
+          fi
+
+          if [ "$CONTINUE" = 1 ]
+          then          
+            echo -e "\n#### STATUS_STEP_PUSH ###"
+            if [ "$STATUS_STEP_PUSH" = 0 ]
+            then
+              echo -e "Status\t[ \033[31;2;1mFAILED\033[0m ]" 
+              MAILMSG+="$MSG_STEP_PUSH\n"
+              CONTINUE=0
+            else
+              echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
+            fi
+          fi          
+
+          if [ "$CONTINUE" = 1 ]
+          then          
+            echo -e "\n#### STATUS_STEP_CREATE_RELEASE ###"
+            if [ "$STATUS_STEP_CREATE_RELEASE" = 0 ]
+            then
+              echo -e "Status\t[ \033[31;2;1mFAILED\033[0m ]" 
+              MAILMSG+="$MSG_STEP_CREATE_RELEASE\n"
+              CONTINUE=0
+            else
+              echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
+            fi
+          fi          
+
+          if [ "$CONTINUE" = 1 ]
+          then          
+            echo -e "\n#### STATUS_STEP_TRIGGER_OR ###"
+            if [ "$STATUS_STEP_TRIGGER_OR" = 0 ]
+            then
+              echo -e "Status\t[ \033[31;2;1mFAILED\033[0m ]" 
+              MAILMSG+="$MSG_STEP_TRIGGER_OR\n"
+              CONTINUE=0
+            else
+              echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
+            fi
+          fi    
+
+          # Send email 
+          if [ "$CONTINUE" = 0 ] 
+          then
+    
+            # Setting SMTP server (docker host)
+            DOCKER_HOST=`/sbin/ip route|awk '/default/ { print $3 }'`
+            echo "set smtp=smtp://${DOCKER_HOST}:25" >> ${MAIL_CONFIG_FILE}
+
+            # Print message in log 
+            echo -e $MAILMSG
+
+            # Send email
+            SUBJECT="[ NEW EXTLIB OPENRADIOSS_EXTLIB ] - Error in CI"
+            echo -e "${MAILMSG}" | ${MAIL_COMMAND} -r ${FROM_EMAIL} -s "${SUBJECT}" ${TO_EMAIL}
+
+            # Exit fail to see it as a failure
+            exit 1
+          fi

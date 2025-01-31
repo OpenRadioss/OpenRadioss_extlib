@@ -1,0 +1,11 @@
+cbuild_*
+vs_build*
+.vs
+exec
+*.swp
+*.swo
+*~
+*.bak
+*.pyc
+.vscode/settings.json
+*.sif
