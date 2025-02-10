@@ -1,8 +1,13 @@
 name: Delivery extlib (incl HMReader from JF) as assets in a release
 
 # This CI is triggerd by Gitlab Radioss CI to get libhmreader from Jfrog, extlib locally, provide them as a release asset, and set the new version to use into OpenRadioss
+# It is also triggered on a push event, the last commit id of hmreader will be used in this case
 
 on:
+
+  push:
+    branches:
+      - main 
 
   workflow_dispatch:
     inputs:
@@ -62,6 +67,7 @@ jobs:
       MSG_STEP_SET_EXLIB_VERSION_IN_OPENRADIOSS: "Could not set extlib version in OpenRadioss repository"     
       STATUS_STEP_TRIGGER_OR: 0
       MSG_STEP_TRIGGER_OR: "Could not trigger OpenRadioss CI"
+      HMREADER_LAST_COMMIT_ID_FILE: ".last_hmreader_commit_id"
 
     steps:
 
@@ -71,7 +77,18 @@ jobs:
           export BRANCH_NAME="${GITHUB_REF#refs/heads/}"
 
           echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
-          
+
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "This is a push event."
+            echo "Getting last hmreader commit id from Jrog"
+            jf rt download ${JF_OPTIONS} --flat=true ${HW_SOLVER_PREFIX}/${HMREADER_PREFIX}/${BRANCH_NAME}/${HMREADER_LAST_COMMIT_ID_FILE} .
+            DELIV_COMMIT=$(cat ${HMREADER_LAST_COMMIT_ID_FILE})
+          else
+            echo "Getting hmreader commit id from input : ${DELIV_COMMIT}"
+          fi
+
+          echo "DELIV_COMMIT = ${DELIV_COMMIT}"
+
           export HM_REMOTE_DIR="${HW_SOLVER_PREFIX}/${HMREADER_PREFIX}/${BRANCH_NAME}/${DELIV_COMMIT}"
           echo "HM_REMOTE_DIR=${HM_REMOTE_DIR}" >> $GITHUB_ENV
 
