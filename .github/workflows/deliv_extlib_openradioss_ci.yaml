@@ -5,9 +5,13 @@ name: Delivery extlib (incl HMReader from JF) as assets in a release
 
 on:
 
-  # push:
-  #   branches:
-  #     - main 
+  # We accept push event only on main branch when commit doesn't include modification of EXTLIB_VERSION.json file, to avoid loop CI call when triggered by workflow_dispatch
+  push:
+    branches:
+      - main 
+    paths:
+      - '**'
+      - '!EXTLIB_VERSION.json'
 
   workflow_dispatch:
     inputs:
