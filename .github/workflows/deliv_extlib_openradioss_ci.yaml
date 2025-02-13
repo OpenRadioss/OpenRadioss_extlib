@@ -5,9 +5,9 @@ name: Delivery extlib (incl HMReader from JF) as assets in a release
 
 on:
 
-  push:
-    branches:
-      - main 
+  # push:
+  #   branches:
+  #     - main 
 
   workflow_dispatch:
     inputs:
