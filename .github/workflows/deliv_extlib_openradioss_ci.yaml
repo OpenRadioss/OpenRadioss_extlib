@@ -241,7 +241,7 @@ jobs:
           tag: "v${{ env.EXTLIB_VERSION }}"
           name: "Extlib v${{ env.EXTLIB_VERSION }}"            
           body: |
-            Find here last ext libs for radioss including hmreader in version v${{ env.EXTLIB_VERSION }} deliverd on ${{ env.CURRENT_DATE }}
+            Find here last ext libs for radioss including hmreader in version v${{ env.EXTLIB_VERSION }} delivered on ${{ env.CURRENT_DATE }}
           files: |
             extlib.zip
           clear_attachments: true    
