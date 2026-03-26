@@ -255,7 +255,7 @@ jobs:
 
       # Trigger OpenRadioss CI to set the new version of extlib and cause a build/qa
       - name: Trigger OpenRadioss CI
-        uses: peter-evans/repository-dispatch@v4
+        uses: peter-evans/repository-dispatch@v1
         with:
           token: ${{ env.GIT_PUSH_SERVBOT_PAT }}
           repository: '${{ secrets.OPENRADIOSS_REPOSITORY }}'
