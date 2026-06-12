@@ -1,163 +1,29 @@
-//Copyright>    Altair H3D software ("H3D")
-//Copyright>    Copyright 1997-2021 Altair Engineering Inc.
-//Copyright>    
-//Copyright>    Altair Engineering Inc. grants to third parties limited permission to 
-//Copyright>    use H3D solely in connection with OpenRadioss software. 
-//Copyright>      
-//Copyright>    H3D IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
-//Copyright>    INCLUDING, BUT NOT LIMITED TO, THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
-//Copyright>    A PARTICULAR PURPOSE, AND NONINFRINGEMENT.  IN NO EVENT SHALL ALTAIR ENGINEERING
-//Copyright>    INC. OR ITS AFFILIATES BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, 
-//Copyright>    WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR
-//Copyright>    IN CONNECTION WITH H3D OR THE USE OR OTHER DEALINGS IN H3D.
-
-#ifndef ALTAIR_HYPER3DAPI_PUBLIC_DEFINITIONS_INCLUDED 
-#define ALTAIR_HYPER3DAPI_PUBLIC_DEFINITIONS_INCLUDED
-
-#if !defined(OS_UNIX) && defined(__sun)
-#   define OS_UNIX
-#elif !defined(OS_UNIX) && defined(__sgi)
-#   define OS_UNIX
-#elif !defined(OS_UNIX) && defined(__linux)
-#   define OS_UNIX
-#elif !defined(OS_UNIX) && defined(_AIX)
-#   define OS_UNIX
-#elif !defined(OS_UNIX) && defined(__hpux)
-#   define OS_UNIX
-#elif defined(__APPLE__) && defined(__MACH__)
-#   define OS_UNIX
-#endif
-
-/* needed to disable stl error checking in Windows VC8 compilers */
-#if !defined(OS_UNIX) && !defined(_DEBUG)
-#   if defined(_SECURE_SCL)
-#       undef _SECURE_SCL
-#   endif
-#   define _SECURE_SCL 0
-#endif
+/*
+** ----------------------------------------------------------------------------
+** Copyright (c) 2001-07 Altair Engineering Inc. All Rights Reserved
+** Contains trade secrets of Altair Engineering, Inc.  Copyright notice 
+** does not imply publication.  Decompilation or disassembly of this 
+** software is strictly prohibited.
+** ----------------------------------------------------------------------------
+*/
+#pragma once
 
 /* for remedial C support */
-#if !defined(OS_UNIX) && !defined(__cplusplus)
+#if defined(H3D_DEFINE_BOOL) && !defined(__cplusplus)
+/*#include <stdbool.h>*/   /* for C99 when available */
 #   define true 1
 #   define false 0
     typedef int bool;
 #endif
 
-/* H3D always uses 64 bit file pointers! */
-#if !defined(compile64)
-#   if defined(OS_UNIX) && !defined(_LARGEFILE64_SOURCE) && !defined(__APPLE__) && !defined(__MACH__)
-#       define _LARGEFILE64_SOURCE
-#   endif
-#endif
-
-/* When using the GNU C/C++ compilers */
-#if defined(USING_GNU) && !defined(_GNU_SOURCE)
-#    define _GNU_SOURCE
-#  endif
-
-/* Left here as a reminder that ENDIAN must be defined during build */
-#if !defined(BIG_ENDIAN_MACHINE) && !defined(LITTLE_ENDIAN_MACHINE)
-#  if defined(__hpux) || defined(_AIX) || defined(__sun) || defined(__sgi)
-#      define BIG_ENDIAN_MACHINE
-#  else
-#      define LITTLE_ENDIAN_MACHINE
-#  endif
-#endif
 
 /* include integer types for size */
-#if defined(__sun)
-#   include <sys/int_types.h>
-#elif defined(__sgi)
-#   include <inttypes.h>
-#elif defined(__linux)
-#   include <stdint.h>
-#elif defined(_AIX)
-#   include <inttypes.h>
-#elif defined(__hpux)
-#   include <inttypes.h>
-#elif defined(__APPLE__) && defined(__MACH__)
-#   define __STDC_LIMIT_MACROS
-#   include <stdint.h>
-#elif !defined(OS_UNIX)
+#if defined(_WIN32)
 #   include <stddef.h>
-
-    /* define int16_t and uint16_t so these can be used on all platforms */
-    #if !defined(int16_t)
-        typedef short               int16_t;
-    #endif
-    #if !defined(uint16_t)
-        typedef unsigned short      uint16_t;
-    #endif
-
-    /* define int32_t and uint32_t so these can be used on all platforms */
-    #if !defined(int32_t)
-        typedef int                 int32_t;
-    #endif
-    #if !defined(uint32_t)
-        typedef unsigned int        uint32_t;
-    #endif
-
-    /* define int64_t and uint64_t so these can be used on all platforms */
-    #if !defined(int64_t)
-        typedef  __int64            int64_t;
-    #endif
-    #if !defined(uint64_t)
-        typedef unsigned __int64    uint64_t;
-    #endif
-#endif
-
-/* document when uint64_t and unsigned long are the same thing      */
-#if defined(__linux) && defined(__WORDSIZE) && __WORDSIZE == 64
-    /* on linux 64, uint64_t and unsigned long generate the same            */
-    /* signature and conflict when __WORDSIZE == 64                         */
-    #define ULONG_AND_UINT64_T_ARE_THE_SAME 1
-#endif
-
-#if defined(__sun) && defined(_LP64)
-    /* on sun, when _LP64 is defined, uint64_t is defined as unsigned long  */
-    /* see: /usr/include/sys/int_types.h                                    */
-    #define ULONG_AND_UINT64_T_ARE_THE_SAME 1
-#endif
-
-#if defined(__sgi) && defined(_MIPS_SZLONG) && _MIPS_SZLONG == 64
-    #define ULONG_AND_UINT64_T_ARE_THE_SAME 1
-#endif
-
-#if defined(__hpux) && !defined(__LL_MODE__)
-    /* on HP, when __LL_MODE__ is defined, uint64_t is defined as           */
-    /* "unsigned long long"                                                 */
-    #define ULONG_AND_UINT64_T_ARE_THE_SAME 1
-#endif
-
-#if defined(_AIX) && defined(__64BIT__)
-    #define ULONG_AND_UINT64_T_ARE_THE_SAME 1
-#endif
-
-#if defined(__APPLE__) && defined(__MACH__)
-    #define ULONG_AND_UINT64_T_ARE_THE_SAME 1
-#endif
-
-#if defined(H3D_NO_THREADS)
-    #   define H3D_OpenMP_DISABLE
+#   include <stdint.h>
 #else
-    #if defined(__sun)
-    #   define H3D_USE_OPENTHREADS
-    #elif defined(__sgi)
-    #   define H3D_USE_OPENTHREADS
-    #elif defined(__linux)
-    #   define H3D_USE_OPENTHREADS
-    #elif defined(_AIX)
-    #   define H3D_USE_OPENTHREADS
-    #elif defined(__hpux)
-    #   define H3D_USE_OPENTHREADS
-    #elif defined(__APPLE__) && defined(__MACH__)
-    #   define H3D_OpenMP_DISABLE
-    #   define H3D_USE_OPENTHREADS
-    #elif !defined(OS_UNIX)
-    #   define H3D_USE_OPENTHREADS
-    #endif
+#   include <stdint.h>
 #endif
-
 
 #include <stdio.h>                          /* for FILE definition                              */
 #include <float.h>                          /* for FLT_MAX definition                           */
@@ -171,13 +37,18 @@
 #define H3D_FileMode int                    /* file creation mode type                          */
 #define H3D_SINGLEFILE 0                    /* standard file creation mode                      */
 #define H3D_MULTIFILEBYSIM 1                /* H3D files grouped by simulation index            */
-#define H3D_APPEND 4                        /* for use with Hyper3DUpdateSimSubcase             */
+#define H3D_APPEND 4                        /* append data to existing file                     */
+#define H3D_NOZLIB 8                        /* file witten with zlib or not                     */
+#define H3D_SORT 16                         /* enable intrablock entity sorting                 */
+#define H3D_QUANT 32                        /* Quantization enabled                             */
+#define H3D_NOSORT 64                       /* disable intrablock entity sorting                */
+#define H3D_DEBUG 128                       /* enable debug trace output to H3DMessageFunction  */
 
 #define H3D_DEFAULT_COMPRESSION_LEVEL 7     /* default runtime length encoding level            */
 
 #define H3D_PATH_MAX 1024                   /* maximum file pathname length                     */
 
-#define H3D_ID unsigned int                 /* standard H3D ID type                             */
+#define H3D_ID uint32_t                     /* standard H3D ID type                             */
 #define H3D_SIM_IDX int                     /* standard H3D simulation index type               */
 
 #define H3D_NULL_ID 0                       /* invalid ID                                       */
@@ -195,20 +66,32 @@
 #define H3D_DEFAULT_NODEPOOL   "Nodes"      /* suggested default node poolname                  */
 #define H3D_DEFAULT_SYSTEMPOOL "Systems"    /* suggested default coord system poolname          */
 
-#define H3D_DEFAULT_FLEXBODYPOOL "Flexible Body" /* suggested default Flexbody poolname         */
-#define H3D_DEFAULT_FLEXELEMPOOL "Flexbody Elements"/* suggested  Flexbody element poolname     */
+#define H3D_DEFAULT_FLEXBODYPOOL "Flexible Body"    /* suggested default Flexbody poolname      */
+#define H3D_DEFAULT_FLEXELEMPOOL "Flexbody Elements"/* suggested Flexbody element poolname      */
 #define H3D_DEFAULT_FLEXNODEPOOL "Flexbody Nodes"   /* suggested default Flexbody node poolname */
 
 #define H3D_NO_RESULT -FLT_MAX              /* tabular data set place holder                    */
 #define H3D_DS_NO_LAYER -1                  /* no specific data set layer flag                  */
 #define H3D_DT_DELIMITER ":"                /* data type "scalar group" delimiter               */
 
-#define H3D_TEXT_FATXML "h3dFATXML"         /* H3D Text tag for FATXML data                     */
+#define H3D_DEFAULT_POISSONRATIO 0.3f       /* default Poisson's ratio for tensor stain         */
+
+#define H3D_TEXT_FATXML    "h3dFATXML"      /* H3D Text tag for FATXML data                     */
+#define H3D_HV_MODEL_XML   "h3dModelXML"    /* H3D Text tag for HV model state data             */
+#define H3D_HV_RESULT_XML  "h3dResultXML"   /* H3D Text tag for HV result state data            */
+#define H3D_HV_DISPLAY_XML "h3dDisplayXML"  /* H3D Text tag for HV display state data           */
 
 
 /**************************/
 /*   Model Entity Enums   */
 /**************************/
+typedef enum _H3D_NodeStorageType 
+{
+    H3D_NODE_UNSET  = 0,
+    H3D_NODE_FLOAT  = 1,
+    H3D_NODE_DOUBLE = 2
+} H3D_NodeStorageType;
+
 typedef enum _H3D_ElementConfig 
 {
     H3D_ELEM_CONFIG_MASS =      1,
@@ -239,11 +122,23 @@ typedef enum _H3D_ElementConfig
     H3D_ELEM_CONFIG_PENTA6 =    206,
     H3D_ELEM_CONFIG_HEX8 =      208,
     H3D_ELEM_CONFIG_TETRA10 =   210,
+    H3D_ELEM_CONFIG_PENTA12 =   212,
     H3D_ELEM_CONFIG_PENTA13 =   213,
     H3D_ELEM_CONFIG_PENTA15 =   215,
+    H3D_ELEM_CONFIG_HEX16 =     216,
     H3D_ELEM_CONFIG_HEX20 =     220
 } H3D_ElementConfig;
-#define H3D_ElementConfig unsigned int
+#define H3D_ElementConfig uint32_t
+
+typedef enum _H3D_ElementStorageType 
+{
+    H3D_ELEM_UNSET          = 0,
+    H3D_ELEM_FORM1          = 1,
+    H3D_ELEM_FORM2          = 2,
+    H3D_ELEM_FORM3          = 3,
+    H3D_ELEM_FORM1_MIXED    = 4,
+    H3D_ELEM_FORM2_MIXED    = 5
+} H3D_ElementStorageType;
 
 typedef enum _H3D_SYSTEM_TYPE 
 {
@@ -252,6 +147,21 @@ typedef enum _H3D_SYSTEM_TYPE
     H3D_SPHERICAL   = 2,
     H3D_TRACKING    = 3
 } H3D_SYSTEM_TYPE;
+#define H3D_SYSTEM_TYPE uint32_t
+
+typedef enum _H3D_SystemStorageType 
+{
+    H3D_SYS_UNSET          = 0,
+    H3D_SYS_FORM1          = 1,
+    H3D_SYS_FORM2          = 2
+} H3D_SystemStorageType;
+
+typedef enum _H3D_SystemDefMethod 
+{
+    H3D_SYS_DM_UNSET        = 0,
+    H3D_SYS_DM_ORIGIN_XY    = 1,
+    H3D_SYS_DM_CIRCLE       = 2
+} H3D_SystemDefMethod;
 
 typedef enum _H3D_PRIMITIVE_TYPE
 {
@@ -277,6 +187,7 @@ typedef struct _H3D_BoxParameters
     float              zsize;
     bool               centered;
 } H3D_BoxParameters;
+
 typedef struct _H3D_MarkerParameters
 {
     H3D_PRIMITIVE_TYPE type;
@@ -304,6 +215,7 @@ typedef struct _H3D_CylinderParameters
     float              semi_z2;
     bool               centered;
 } H3D_CylinderParameters;
+
 typedef struct _H3D_EllipsoidParameters
 {
     H3D_PRIMITIVE_TYPE type;
@@ -314,18 +226,21 @@ typedef struct _H3D_EllipsoidParameters
     float              semi_y;
     float              semi_z;
 } H3D_EllipsoidParameters;
+
 typedef struct _H3D_MeshParameters
 {
     H3D_PRIMITIVE_TYPE type;
-    unsigned int       tconn_length;
-    unsigned int       lconn_length;
-    unsigned int       num_nodes;
+    uint32_t           tconn_length;
+    uint32_t           lconn_length;
+    uint32_t           num_nodes;
 } H3D_MeshParameters;
+
 typedef struct _H3D_OutlineParameters
 {
     H3D_PRIMITIVE_TYPE type;
-    unsigned int       num_markers;
+    uint32_t           num_markers;
 } H3D_OutlineParameters;
+
 typedef struct _H3D_SpringParameters
 {
     H3D_PRIMITIVE_TYPE type;
@@ -340,8 +255,8 @@ typedef struct _H3D_SpringParameters
     float              diameter_spring;
     float              diameter_damper1;
     float              diameter_damper2;
-    int                helix_coils;
-    int                helix_segs;
+    int32_t            helix_coils;
+    int32_t            helix_segs;
 } H3D_SpringParameters;
 
 typedef enum _H3D_FLEX_TYPE 
@@ -469,21 +384,41 @@ typedef enum _H3D_MODAL_TYPE
     H3D_MODT_RIGIDBODY      =  1<<4     
 } H3D_MODAL_TYPE;
 
+typedef enum _H3D_PROP_ISOP
+{ 
+    H3D_PROP_ISOP_UNSET     =  0,       /* general purpose none              */
+    H3D_PROP_ISOP_FULL      =  1<<1,    
+    H3D_PROP_ISOP_MODPLAST  =  1<<2,    
+    H3D_PROP_ISOP_REDPLAST  =  1<<3,    
+    H3D_PROP_ISOP_INT0      =  1<<4     
+} H3D_PROP_ISOP;
+
+typedef enum _H3D_PROP_FCTN
+{
+    H3D_PROP_FCTN_UNSET     =  0,       /* general purpose none              */
+    H3D_PROP_FCTN_SMECH     =  1<<1,    
+    H3D_PROP_FCTN_PFLUID    =  1<<2,    
+    H3D_PROP_FCTN_PORO      =  1<<3,    
+} H3D_PROP_FCTN;
+
+
 /*******************************/
 /*   Model Entity Attributes   */
 /*******************************/
 
 typedef enum _H3D_MODEL_ATTRIBS
 {
-    H3D_MODEL_ATTR_NONE            =  0,     /* general purpose none                   */
-    H3D_MODEL_ATTR_LOC             =  1<<1,  /* model locator data                     */
-    H3D_MODEL_ATTR_SYNC_MODE       =  1<<2,  /* Hv Display Sync Mode Flag              */
-    H3D_MODEL_ATTR_GRAD_COLOR      =  1<<3,  /* Hv Display Apply Gradient Color        */
-    H3D_MODEL_ATTR_COLOR_PART      =  1<<4,  /* Hv Display Color By Part               */
-    H3D_MODEL_ATTR_COLOR_MODEL     =  1<<5,  /* Hv Display Color By Model              */
-    H3D_MODEL_ATTR_COLOR_CONFIG    =  1<<6,  /* Hv Display Color By Element Config     */
-    H3D_MODEL_ATTR_COLOR_DIMENSION =  1<<7,  /* Hv Display Color By Element Dimension  */
-    H3D_MODEL_ATTR_COLOR_NORMAL    =  1<<8   /* Hv Display Color By Normal             */
+    H3D_MODEL_ATTR_NONE               =  0,     /* general purpose none                   */
+    H3D_MODEL_ATTR_LOC                =  1<<1,  /* model locator data                     */
+    H3D_MODEL_ATTR_SYNC_MODE          =  1<<2,  /* Hv Display Sync Mode Flag              */
+    H3D_MODEL_ATTR_GRAD_COLOR         =  1<<3,  /* Hv Display Apply Gradient Color        */
+    H3D_MODEL_ATTR_COLOR_PART         =  1<<4,  /* Hv Display Color By Part               */
+    H3D_MODEL_ATTR_COLOR_MODEL        =  1<<5,  /* Hv Display Color By Model              */
+    H3D_MODEL_ATTR_COLOR_CONFIG       =  1<<6,  /* Hv Display Color By Element Config     */
+    H3D_MODEL_ATTR_COLOR_DIMENSION    =  1<<7,  /* Hv Display Color By Element Dimension  */
+    H3D_MODEL_ATTR_COLOR_NORMAL       =  1<<8,  /* Hv Display Color By Normal             */
+    H3D_MODEL_ATTR_COLOR_PARTASSEMBLY =  1<<9   /* Hv Display Color By Part Assembly      */
+
 } H3D_MODEL_ATTRIBS;
 
 typedef enum _H3D_ASSEMBLY_ATTRIBS
@@ -593,16 +528,44 @@ typedef enum _H3D_ID_POOL_TYPE
     H3D_POOL_COMPONENT = 3, 
     H3D_POOL_SYSTEM    = 4, 
     H3D_POOL_ASSEMBLY  = 5,
-    H3D_POOL_MODEL     = 6
+    H3D_POOL_MODEL     = 6,
+    H3D_POOL_SET       = 7,
+    H3D_POOL_MARKER    = 8
 } H3D_ID_POOL_TYPE;
 
 
 typedef enum _H3D_ANALYSIS_TYPE
 {
-    H3D_ANALYSIS_UNSET = 0,
-    H3D_LINEAR_REAL    = 1,    /* small displacements (real), shell coordinate sysystems don't deform  */
-    H3D_LINEAR_COMPLEX = 2,    /* small displacements (complex), shell coordinate systems don't deform */
-    H3D_NONLINEAR      = 3     /* large displacements (real), shell coordinate systems deform          */
+    H3D_ANALYSIS_UNSET          = 0,
+    H3D_LINEAR_REAL             = 1,    /* HV small displacements (real), shell coordinate systems don't deform    */
+    H3D_LINEAR_COMPLEX          = 2,    /* HV small displacements (complex), shell coordinate systems don't deform */
+    H3D_NONLINEAR               = 3,    /* HV large displacements (real), shell coordinate systems deform          */
+    H3D_OS_STATICS              = 4,    /* LINEAR_REAL          */
+    H3D_OS_NLSTAT               = 5,    /* NONLINEAR            */
+    H3D_OS_MODES                = 6,    /* LINEAR_REAL          */
+    H3D_OS_MCEIG                = 7,    /* LINEAR_COMPLEX       */
+    H3D_OS_BUCK                 = 8,    /* LINEAR_REAL          */
+    H3D_OS_DFREQ                = 9,    /* LINEAR_COMPLEX       */
+    H3D_OS_MFREQ                = 10,   /* LINEAR_COMPLEX       */
+    H3D_OS_DTRAN_LINEAR         = 11,   /* NONLINEAR            */
+    H3D_OS_DTRAN_NONLINEAR      = 12,   /* NONLINEAR            */
+    H3D_OS_MTRAN                = 13,   /* NONLINEAR            */
+    H3D_OS_DFOUR_TIME           = 14,   /* NONLINEAR            */
+    H3D_OS_DFOUR_FREQ           = 15,   /* LINEAR_COMPLEX       */
+    H3D_OS_MFOUR_TIME           = 16,   /* NONLINEAR            */
+    H3D_OS_MFOUR_FREQ           = 17,   /* LINEAR_COMPLEX       */
+    H3D_OS_HEAT_STEADY          = 18,   /* LINEAR_REAL          */
+    H3D_OS_HEAT_TRANSIENT       = 19,   /* NONLINEAR            */
+    H3D_OS_NLHEAT_STEADY        = 20,   /* NONLINEAR            */
+    H3D_OS_NLHEAT_TRANSIENT     = 21,   /* NONLINEAR            */
+    H3D_OS_MBD                  = 22,   /* NONLINEAR            */
+    H3D_OS_EXPDYN               = 23,   /* NONLINEAR            */
+    H3D_OS_FATIGUE              = 24,   /* LINEAR_REAL          */
+    H3D_OS_RANDOM               = 25,   /* LINEAR_REAL          */
+    H3D_OS_NLEXPL               = 26,   /* NONLINEAR            */
+    H3D_OS_RSPEC                = 27,   /* LINEAR_REAL          */
+    H3D_OS_DCEIG                = 28,   /* LINEAR_COMPLEX       */
+    H3D_OS_CMSMETH              = 29
 } H3D_ANALYSIS_TYPE;
 
 typedef enum _H3D_NODAL_DATA_TYPE 
@@ -621,7 +584,7 @@ typedef enum _H3D_SUBCASE_TYPE
     H3D_SUBCASE_ENVELOPE_MIN  = 3,  /* Envelope with MIN function       */
     H3D_SUBCASE_ENVELOPE_MAX  = 4,  /* Envelope with MAX function       */
     H3D_SUBCASE_ENVELOPE_EXT  = 5,  /* Envelope with EXTREME function   */
-	H3D_SUBCASE_ENVELOPE_RNG  = 6   /* Envelope with RANGE function     */
+    H3D_SUBCASE_ENVELOPE_RNG  = 6   /* Envelope with RANGE function     */
 } H3D_SUBCASE_TYPE;
 
 
@@ -668,6 +631,14 @@ typedef enum _H3D_DS_FORMAT
     H3D_DS_FLEX_THICKNESS    = 23   /* 0 dataset must extracted from flex body          */
 } H3D_DS_FORMAT;
 
+typedef enum _H3D_NF_FORMAT
+{
+    H3D_NF_UNSET            = 0,
+    H3D_NF_REAL             = 1, 
+    H3D_NF_COMPLEX_CART     = 2,    /* complex retangular (real/imaginary) format       */
+    H3D_NF_COMPLEX_POLAR    = 3     /* complex polar (magnitude/phase) format           */
+} H3D_NF_FORMAT;
+
 typedef enum _H3D_ANALYSIS_SYSTEM
 {
     H3D_DS_UNSET    = INT_MIN,
@@ -687,29 +658,19 @@ typedef enum _H3D_TENSOR_TYPE
     H3D_DS_ESTRAIN    = 1<<3,
     H3D_DS_ESTRAIN_2D = 1<<4
 } H3D_TENSOR_TYPE;
-#define H3D_DEFAULT_POISSONRATIO 0.3f   /* default Poisson's ratio for tensor stain     */
 
-
-
-
-/**************************/
-/*  File Info Structure   */
-/**************************/
 
 /* forward declaration */
-typedef struct _H3DFileInfo H3DFileInfo; 
+typedef struct _H3DFileInfo { 
+    void* data; 
+    void* client_data1;
+    void* client_data2;
+} H3DFileInfo; 
+
 typedef struct _H3DReaderFunctionTable H3DReaderFunctionTable;
-#if defined(__cplusplus)
-    class  CH3DTOC;
-    class  CH3DEntity;
-    class  h3dreader_private;
-    class  H3D8_TensorCompatability;
-#else
-#   define CH3DTOC void
-#   define CH3DEntity void
-#   define h3dreader_private void
-#   define H3D8_TensorCompatability void
-#endif
+
+typedef void (*H3DErrorFunctionType)(H3DFileInfo* context, const char* errorText);
+typedef void (*H3DMessageFunctionType)(H3DFileInfo* context, const char* messageText);
 
 typedef enum _H3D_TRIBOOL
 {
@@ -717,65 +678,3 @@ typedef enum _H3D_TRIBOOL
     H3D_BOOL_FALSE = 0,
     H3D_BOOL_TRUE  = 1
 } H3D_TRIBOOL;
-
-typedef void (*H3DErrorFunctionType)(H3DFileInfo* h3d_file, const char* errorText);
-typedef void (*H3DMessageFunctionType)(H3DFileInfo* h3d_file, const char* messageText);
-
-typedef struct _H3DFileInfo
-{
-    FILE* fileptr;                  /* file ptr                             */
-    char* filename;                 /* File name                            */
-    H3D_FileMode file_mode;         /* how file was opened                  */
-    float version;                  /* File content version                 */
-
-    /* for H3D_MULTIFILEBYSIM support */
-    char* file_prefix;              /* fileset prefix                       */
-    int file_idx;                   /* current file index                   */
-    FILE* base_fileptr;             /* file ptr                             */
-
-    H3DErrorFunctionType   errorMsgFunc;
-    H3DMessageFunctionType messageFunc;
-
-    CH3DTOC* toc;                   /* The Table of Contents (of file)      */
-    bool model_set;
-    unsigned int model_id;          /* current model reading/writing        */
-    H3D_TRIBOOL model_tabular;      /* current model tabular mode           */
-    H3D_TRIBOOL model_adaptive;     /* current model tabular mode           */
-
-    /* writer data */
-    CH3DEntity* entity;             /* current entity being written         */
-    unsigned int required;      
-    unsigned int compression_level; /* runtime length encode level          */
-    unsigned int sorting_level;     /* runtime sorting level                */
-    double quantize_error;          /* approximation error                  */
-    unsigned char* compressed;      /* buffer for raw compressed data i/o   */
-    unsigned int compressedLen;     /* length of compressed                 */
-    FILE*        exTiming_fileptr;  /* enable/disable runtime statistics    */
-    FILE*        srtTiming_fileptr; /* enable/disable runtime statistics    */
-    char*        trace_name;        /* class name for timing info           */
-    unsigned int bFlex_comp_level;  /* blocked Flex data encode level       */
-    unsigned int save_comp_level;   /* internal use only                    */
-
-    /* reader data */
-    H3DReaderFunctionTable* h3d_ft;
-    bool swapbytes;                 /* byte swapping required when reading  */
-    unsigned int compress_min;      /* minimum size of compressed data      */
-    unsigned int toc_fpos;          /* TOC block location within the file   */
-    unsigned int toc_fpos2;
-    bool         fast_flex;         /* enable mmapping of Flex mode data    */
-    FILE*        imTiming_fileptr;  /* enable/disable runtime statistics    */
-    unsigned int num_processors;    /* num processors available             */
-    unsigned int num_threads;       /* num threads to use                   */
-
-    /* pre-H3D8 legacy reader data */
-    bool large_file;                /* Indicates use of 64-bit offsets      */
-
-    /* added implementation specific stuff here */
-    h3dreader_private* h3d;         /* Altair reader context                */
-    H3D8_TensorCompatability* res_pools; /* H3D private                 */
-
-    void* client_data1;
-    void* client_data2;
-} H3DFileInfo;
-
-#endif /* ALTAIR_HYPER3DAPI_PUBLIC_DEFINITIONS_INCLUDED */
