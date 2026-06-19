@@ -73,6 +73,9 @@ H3D_Export uint32_t Hyper3DExportLibraryVersion(uint32_t* majorVersion, uint32_t
 
 H3D_Export H3DFileInfo* Hyper3DExportOpen(const char* filename, H3D_FileMode mode, 
                     H3DMessageFunctionType mFunc, H3DErrorFunctionType eFunc);
+                    
+H3D_Export bool Hyper3DCompressionLevel(H3DFileInfo* h3d_file, unsigned int level);
+
 H3D_Export H3DFileInfo* Hyper3DExportVersionOpen(const char* filename, H3D_FileMode mode, 
                     uint32_t majorVersion, uint32_t minorVersion, 
                     H3DMessageFunctionType mFunc, H3DErrorFunctionType eFunc);
@@ -644,7 +647,7 @@ H3D_Export bool Hyper3DDenseMtxWrite(H3DFileInfo* h3d_file, H3D_ID id,
                     uint32_t start_column_id, 
                     uint32_t num_cols, void* data);
 
-/* For a sparse m×n matrix, M, we need to store three one-dimensional        */
+/* For a sparse m * n matrix, M, we need to store three one-dimensional        */
 /* arrays. Let NNZ denote the number of nonzero entries of M.                */
 /* The first array is A, which is of length NNZ, and holds all nonzero       */
 /* entries of M in top-to-bottom left-to-right order.                        */
