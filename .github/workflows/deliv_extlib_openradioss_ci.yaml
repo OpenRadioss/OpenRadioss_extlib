@@ -68,6 +68,8 @@ jobs:
       MSG_STEP_PUSH_OR: "Could not push extlib version on OpenRadioss repository"  
       STATUS_STEP_CREATE_RELEASE: 0
       MSG_STEP_CREATE_RELEASE: "Could not create release on repository"
+      STATUS_STEP_CLEAN_RELEASE: 0
+      MSG_STEP_CLEAN_RELEASE: "Could not clean old releases on repository"
       STATUS_STEP_SET_EXLIB_VERSION_IN_OPENRADIOSS: 0
       MSG_STEP_SET_EXLIB_VERSION_IN_OPENRADIOSS: "Could not set extlib version in OpenRadioss repository"     
       STATUS_STEP_TRIGGER_OR: 0
@@ -179,7 +181,7 @@ jobs:
           git branch && git log --pretty=oneline -n 5
           echo "-------"      
 
-          # # Opensource libs
+          # Opensource libs
           jf rt download ${JF_OPTIONS} --flat=true --recursive --exclusions="*/_com/*" "${{ env.HM_REMOTE_DIR }}/(*)" ${HMREADER_OPENSOURCE_LOCAL_DIR}/{1}
 
           # Get current date in YYYY-MM-DD format
@@ -224,17 +226,14 @@ jobs:
         with:
           github_token: ${{ env.GIT_PUSH_SERVBOT_PAT }}
           branch: ${{ github.ref }}     
-          directory: ${{ env.WORKDIR }}    
 
       - name: Set push status
-        working-directory: ${{ env.WORKDIR }}
         run: |    
           # Set correct end of step status (if not an email will be sent)
           echo "STATUS_STEP_PUSH=1" >> $GITHUB_ENV
+          NEW_VERSION_FULL_SHA=$(git rev-parse HEAD)
+          echo "NEW_VERSION_FULL_SHA=${NEW_VERSION_FULL_SHA}" >> $GITHUB_ENV
 
-      # The action creates the release with an already existing tag (latest-xxxxx) so we use option skip_tag_creation: true
-      # We do this because we have already checkouted the wanted commit before
-      # Prerequisite: create the tag with command : git tag latest-YYYMMDD <commit id>; git push origin latest-YYYMMDD
       - name: Release the new binaries
         uses: docker://ghcr.io/mini-bomba/create-github-release:v1.2.0
         with:
@@ -245,10 +244,10 @@ jobs:
             Find here last ext libs for radioss including hmreader in version v${{ env.EXTLIB_VERSION }} delivered on ${{ env.CURRENT_DATE }}
           files: |
             extlib.zip
-          clear_attachments: true    
+          clear_attachments: true
+          target_commit: ${{ env.NEW_VERSION_FULL_SHA }}
 
       - name: Set release creation status
-        working-directory: ${{ env.WORKDIR }}
         run: |    
           # Set correct end of step status (if not an email will be sent)
           echo "STATUS_STEP_CREATE_RELEASE=1" >> $GITHUB_ENV
@@ -263,10 +262,88 @@ jobs:
           client-payload: '{"ref": "${{ github.ref }}", "version": "${{ env.EXTLIB_VERSION }}", "delivery_date": "${{ env.CURRENT_DATE }}","url": "${{ env.EXTLIB_URL }}"}'
 
       - name: Trigger OpenRadioss CI to set extlib version
-        working-directory: ${{ env.WORKDIR }}
         run: |    
           # Set correct end of step status (if not an email will be sent)
           echo "STATUS_STEP_TRIGGER_OR=1" >> $GITHUB_ENV
+
+      - name: Clean up old releases
+        run: |
+          set +e  # Don't exit on errors
+          CLEAN_FAILED=0
+
+          # This command exit with 1 even when everything is OK ...
+          gh auth login -h github.com || echo ""
+          gh auth setup-git
+          gh auth status
+
+          CURRENT_DATE=$(date -u +%s)
+          ONE_MONTH_SECONDS=$((30 * 24 * 60 * 60))
+          MIN_RELEASES_TO_KEEP=5
+          RELEASES_DELETED=0
+          RELEASES_KEPT=0
+          
+          echo "Fetching all releases..."
+          
+          # Get all releases sorted by creation date (newest first)
+          RELEASES=$(gh release list --limit 1000 --json createdAt,name,tagName --template '{{range .}}{{.createdAt}},{{.tagName}},{{.name}},{{end}}')
+          
+          # Convert to array
+          IFS=',' read -ra RELEASE_ARRAY <<< "${RELEASES%,}"
+          
+          # Process each release
+          for ((i=0; i<${#RELEASE_ARRAY[@]}; i+=3)); do
+            if [ $((i+2)) -ge ${#RELEASE_ARRAY[@]} ]; then
+              break
+            fi
+            
+            CREATED_AT="${RELEASE_ARRAY[$i]}"
+            TAG_NAME="${RELEASE_ARRAY[$((i+1))]}"
+            RELEASE_NAME="${RELEASE_ARRAY[$((i+2))]}"
+            
+            # Skip if release name is empty (last element)
+            if [ -z "$TAG_NAME" ]; then
+              break
+            fi
+            
+            # Keep first 5 releases regardless of age
+            if [ $RELEASES_KEPT -lt $MIN_RELEASES_TO_KEEP ]; then
+              echo "Keeping release: $RELEASE_NAME (tag: $TAG_NAME) - within top 5 most recent"
+              ((RELEASES_KEPT++))
+              continue
+            fi
+            
+            # Convert created date to timestamp
+            CREATED_TIMESTAMP=$(date -d "$CREATED_AT" -u +%s 2>/dev/null || echo 0)
+            
+            if [ $CREATED_TIMESTAMP -eq 0 ]; then
+              echo "Warning: Could not parse date for $RELEASE_NAME, keeping it"
+              continue
+            fi
+            
+            # Calculate age in seconds
+            AGE=$((CURRENT_DATE - CREATED_TIMESTAMP))
+            
+            # If older than 1 month, delete
+            if [ $AGE -gt $ONE_MONTH_SECONDS ]; then
+              echo "Deleting old release: $RELEASE_NAME (tag: $TAG_NAME) - Age: $((AGE / 86400)) days"
+              if gh release delete "$TAG_NAME" --yes; then
+                ((RELEASES_DELETED++))
+              else
+                echo "Warning: failed to delete release tag $TAG_NAME"
+                CLEAN_FAILED=1
+              fi
+            else
+              echo "Keeping release: $RELEASE_NAME (tag: $TAG_NAME) - Age: $((AGE / 86400)) days (less than 30 days)"
+              ((RELEASES_KEPT++))
+            fi
+          done
+          
+          echo "Release cleanup completed: $RELEASES_DELETED deleted, $RELEASES_KEPT kept"
+          if [ "$CLEAN_FAILED" = 0 ]; then
+            echo "STATUS_STEP_CLEAN_RELEASE=1" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.SERVBOT_PAT }}
 
       - name: Managing step execution
         if: ${{ always() }}
@@ -350,6 +427,19 @@ jobs:
               echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
             fi
           fi    
+
+          if [ "$CONTINUE" = 1 ]
+          then
+            echo -e "\n#### STATUS_STEP_CLEAN_RELEASE ###"
+            if [ "$STATUS_STEP_CLEAN_RELEASE" = 0 ]
+            then
+              echo -e "Status\t[ \033[31;2;1mFAILED\033[0m ]"
+              MAILMSG+="$MSG_STEP_CLEAN_RELEASE\n"
+              CONTINUE=0
+            else
+              echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
+            fi
+          fi
 
           # Send email 
           if [ "$CONTINUE" = 0 ] 
