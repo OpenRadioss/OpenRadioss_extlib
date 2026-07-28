@@ -277,7 +277,7 @@ jobs:
           gh auth status
 
           CURRENT_DATE=$(date -u +%s)
-          ONE_MONTH_SECONDS=$((30 * 24 * 60 * 60))
+          ONE_YEAR_SECONDS=$((365 * 24 * 60 * 60))
           MIN_RELEASES_TO_KEEP=5
           RELEASES_DELETED=0
           RELEASES_KEPT=0
@@ -323,8 +323,8 @@ jobs:
             # Calculate age in seconds
             AGE=$((CURRENT_DATE - CREATED_TIMESTAMP))
             
-            # If older than 1 month, delete
-            if [ $AGE -gt $ONE_MONTH_SECONDS ]; then
+            # If older than 1 year, delete
+            if [ $AGE -gt $ONE_YEAR_SECONDS ]; then
               echo "Deleting old release: $RELEASE_NAME (tag: $TAG_NAME) - Age: $((AGE / 86400)) days"
               if gh release delete "$TAG_NAME" --yes; then
                 ((RELEASES_DELETED++))
@@ -333,7 +333,7 @@ jobs:
                 CLEAN_FAILED=1
               fi
             else
-              echo "Keeping release: $RELEASE_NAME (tag: $TAG_NAME) - Age: $((AGE / 86400)) days (less than 30 days)"
+              echo "Keeping release: $RELEASE_NAME (tag: $TAG_NAME) - Age: $((AGE / 86400)) days (less than 1 year)"
               ((RELEASES_KEPT++))
             fi
           done
