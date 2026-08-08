@@ -266,84 +266,84 @@ jobs:
           # Set correct end of step status (if not an email will be sent)
           echo "STATUS_STEP_TRIGGER_OR=1" >> $GITHUB_ENV
 
-      - name: Clean up old releases
-        run: |
-          set +e  # Don't exit on errors
-          CLEAN_FAILED=0
+      # - name: Clean up old releases
+      #   run: |
+      #     set +e  # Don't exit on errors
+      #     CLEAN_FAILED=0
 
-          # This command exit with 1 even when everything is OK ...
-          gh auth login -h github.com || echo ""
-          gh auth setup-git
-          gh auth status
+      #     # This command exit with 1 even when everything is OK ...
+      #     gh auth login -h github.com || echo ""
+      #     gh auth setup-git
+      #     gh auth status
 
-          CURRENT_DATE=$(date -u +%s)
-          ONE_YEAR_SECONDS=$((365 * 24 * 60 * 60))
-          MIN_RELEASES_TO_KEEP=5
-          RELEASES_DELETED=0
-          RELEASES_KEPT=0
+      #     CURRENT_DATE=$(date -u +%s)
+      #     ONE_YEAR_SECONDS=$((365 * 24 * 60 * 60))
+      #     MIN_RELEASES_TO_KEEP=5
+      #     RELEASES_DELETED=0
+      #     RELEASES_KEPT=0
           
-          echo "Fetching all releases..."
+      #     echo "Fetching all releases..."
           
-          # Get all releases sorted by creation date (newest first)
-          RELEASES=$(gh release list --limit 1000 --json createdAt,name,tagName --template '{{range .}}{{.createdAt}},{{.tagName}},{{.name}},{{end}}')
+      #     # Get all releases sorted by creation date (newest first)
+      #     RELEASES=$(gh release list --limit 1000 --json createdAt,name,tagName --template '{{range .}}{{.createdAt}},{{.tagName}},{{.name}},{{end}}')
           
-          # Convert to array
-          IFS=',' read -ra RELEASE_ARRAY <<< "${RELEASES%,}"
+      #     # Convert to array
+      #     IFS=',' read -ra RELEASE_ARRAY <<< "${RELEASES%,}"
           
-          # Process each release
-          for ((i=0; i<${#RELEASE_ARRAY[@]}; i+=3)); do
-            if [ $((i+2)) -ge ${#RELEASE_ARRAY[@]} ]; then
-              break
-            fi
+      #     # Process each release
+      #     for ((i=0; i<${#RELEASE_ARRAY[@]}; i+=3)); do
+      #       if [ $((i+2)) -ge ${#RELEASE_ARRAY[@]} ]; then
+      #         break
+      #       fi
             
-            CREATED_AT="${RELEASE_ARRAY[$i]}"
-            TAG_NAME="${RELEASE_ARRAY[$((i+1))]}"
-            RELEASE_NAME="${RELEASE_ARRAY[$((i+2))]}"
+      #       CREATED_AT="${RELEASE_ARRAY[$i]}"
+      #       TAG_NAME="${RELEASE_ARRAY[$((i+1))]}"
+      #       RELEASE_NAME="${RELEASE_ARRAY[$((i+2))]}"
             
-            # Skip if release name is empty (last element)
-            if [ -z "$TAG_NAME" ]; then
-              break
-            fi
+      #       # Skip if release name is empty (last element)
+      #       if [ -z "$TAG_NAME" ]; then
+      #         break
+      #       fi
             
-            # Keep first 5 releases regardless of age
-            if [ $RELEASES_KEPT -lt $MIN_RELEASES_TO_KEEP ]; then
-              echo "Keeping release: $RELEASE_NAME (tag: $TAG_NAME) - within top 5 most recent"
-              ((RELEASES_KEPT++))
-              continue
-            fi
+      #       # Keep first 5 releases regardless of age
+      #       if [ $RELEASES_KEPT -lt $MIN_RELEASES_TO_KEEP ]; then
+      #         echo "Keeping release: $RELEASE_NAME (tag: $TAG_NAME) - within top 5 most recent"
+      #         ((RELEASES_KEPT++))
+      #         continue
+      #       fi
             
-            # Convert created date to timestamp
-            CREATED_TIMESTAMP=$(date -d "$CREATED_AT" -u +%s 2>/dev/null || echo 0)
+      #       # Convert created date to timestamp
+      #       CREATED_TIMESTAMP=$(date -d "$CREATED_AT" -u +%s 2>/dev/null || echo 0)
             
-            if [ $CREATED_TIMESTAMP -eq 0 ]; then
-              echo "Warning: Could not parse date for $RELEASE_NAME, keeping it"
-              continue
-            fi
+      #       if [ $CREATED_TIMESTAMP -eq 0 ]; then
+      #         echo "Warning: Could not parse date for $RELEASE_NAME, keeping it"
+      #         continue
+      #       fi
             
-            # Calculate age in seconds
-            AGE=$((CURRENT_DATE - CREATED_TIMESTAMP))
+      #       # Calculate age in seconds
+      #       AGE=$((CURRENT_DATE - CREATED_TIMESTAMP))
             
-            # If older than 1 year, delete
-            if [ $AGE -gt $ONE_YEAR_SECONDS ]; then
-              echo "Deleting old release: $RELEASE_NAME (tag: $TAG_NAME) - Age: $((AGE / 86400)) days"
-              if gh release delete "$TAG_NAME" --yes; then
-                ((RELEASES_DELETED++))
-              else
-                echo "Warning: failed to delete release tag $TAG_NAME"
-                CLEAN_FAILED=1
-              fi
-            else
-              echo "Keeping release: $RELEASE_NAME (tag: $TAG_NAME) - Age: $((AGE / 86400)) days (less than 1 year)"
-              ((RELEASES_KEPT++))
-            fi
-          done
+      #       # If older than 1 year, delete
+      #       if [ $AGE -gt $ONE_YEAR_SECONDS ]; then
+      #         echo "Deleting old release: $RELEASE_NAME (tag: $TAG_NAME) - Age: $((AGE / 86400)) days"
+      #         if gh release delete "$TAG_NAME" --yes; then
+      #           ((RELEASES_DELETED++))
+      #         else
+      #           echo "Warning: failed to delete release tag $TAG_NAME"
+      #           CLEAN_FAILED=1
+      #         fi
+      #       else
+      #         echo "Keeping release: $RELEASE_NAME (tag: $TAG_NAME) - Age: $((AGE / 86400)) days (less than 1 year)"
+      #         ((RELEASES_KEPT++))
+      #       fi
+      #     done
           
-          echo "Release cleanup completed: $RELEASES_DELETED deleted, $RELEASES_KEPT kept"
-          if [ "$CLEAN_FAILED" = 0 ]; then
-            echo "STATUS_STEP_CLEAN_RELEASE=1" >> $GITHUB_ENV
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.SERVBOT_PAT }}
+      #     echo "Release cleanup completed: $RELEASES_DELETED deleted, $RELEASES_KEPT kept"
+      #     if [ "$CLEAN_FAILED" = 0 ]; then
+      #       echo "STATUS_STEP_CLEAN_RELEASE=1" >> $GITHUB_ENV
+      #     fi
+      #   env:
+      #     GH_TOKEN: ${{ secrets.SERVBOT_PAT }}
 
       - name: Managing step execution
         if: ${{ always() }}
