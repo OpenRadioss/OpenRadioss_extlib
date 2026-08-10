@@ -68,7 +68,7 @@ jobs:
       MSG_STEP_PUSH_OR: "Could not push extlib version on OpenRadioss repository"  
       STATUS_STEP_CREATE_RELEASE: 0
       MSG_STEP_CREATE_RELEASE: "Could not create release on repository"
-      STATUS_STEP_CLEAN_RELEASE: 0
+      # STATUS_STEP_CLEAN_RELEASE: 0
       MSG_STEP_CLEAN_RELEASE: "Could not clean old releases on repository"
       STATUS_STEP_SET_EXLIB_VERSION_IN_OPENRADIOSS: 0
       MSG_STEP_SET_EXLIB_VERSION_IN_OPENRADIOSS: "Could not set extlib version in OpenRadioss repository"     
@@ -428,18 +428,18 @@ jobs:
             fi
           fi    
 
-          if [ "$CONTINUE" = 1 ]
-          then
-            echo -e "\n#### STATUS_STEP_CLEAN_RELEASE ###"
-            if [ "$STATUS_STEP_CLEAN_RELEASE" = 0 ]
-            then
-              echo -e "Status\t[ \033[31;2;1mFAILED\033[0m ]"
-              MAILMSG+="$MSG_STEP_CLEAN_RELEASE\n"
-              CONTINUE=0
-            else
-              echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
-            fi
-          fi
+          # if [ "$CONTINUE" = 1 ]
+          # then
+          #   echo -e "\n#### STATUS_STEP_CLEAN_RELEASE ###"
+          #   if [ "$STATUS_STEP_CLEAN_RELEASE" = 0 ]
+          #   then
+          #     echo -e "Status\t[ \033[31;2;1mFAILED\033[0m ]"
+          #     MAILMSG+="$MSG_STEP_CLEAN_RELEASE\n"
+          #     CONTINUE=0
+          #   else
+          #     echo -e "Status\t[ \033[32;2;1mOK\033[0m ]"
+          #   fi
+          # fi
 
           # Send email 
           if [ "$CONTINUE" = 0 ] 
